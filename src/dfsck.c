@@ -34,7 +34,7 @@
 #include "include/dfs_allocation.h"
 #include "include/dfsck_util.h"
 #include "include/interval_tree_util.h"
-#include "rbtree.h"
+#include "include/rbtree.h"
 
 
 #define DB_MODE         1   /* Set to 1 to enable debug printouts. */
