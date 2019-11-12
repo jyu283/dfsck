@@ -1,0 +1,11 @@
+#!/bin/bash
+# Script to test run the checker
+
+gcc corrupt_chunk.c dfsck_util.c interval_tree_util.c -o corrupt_chunk
+echo "Copying test image..."
+cp ../images/latest.dfs test.dfs 
+echo "Running corrupt_chunk..."
+./corrupt_chunk test.dfs 2
+echo "Copying corrupted image to parent folder..."
+cp test.dfs ../images/corrupted/corrupted.dfs
+rm test.dfs
