@@ -36,7 +36,14 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define DB_MODE         1   /* Set to 1 to enable debug printouts. */
+// #define DB_MODE         1   /* Set to 1 to enable debug printouts. */
+
+#ifdef DB_MODE
+#define dprintf(...)    printf(__VA_ARGS__)
+#else
+#define dprintf(...)    do {} while (0) 
+#endif
+
 /* Frequently used image addresses */
 struct dfs_fs *sb;   // superblock
 struct lazy_list_head *llist_heads;  // lazy list heads
@@ -469,10 +476,8 @@ static int relink_dentries(struct dfs_dentry *dentry, struct dfs_inode *dir_inod
         if (curr_dentry->parent == target_addr) {
             bool visited = stack_find(curr_dentry, visited_dents);
             if (!visited) {
-                if (DB_MODE) {
-                    printf(GRN "\t> Found lost dentry (%s) at %lx (size = %ld)!\n" RESET,
+                dprintf(GRN "\t> Found lost dentry (%s) at %lx (size = %ld)!\n" RESET,
                         curr_dentry->name, DB_get_off(curr_dentry), dfs_dentry_size(curr_dentry));
-                }
                 found_count++;
                 // Attach newly found dentry to the end of the list
                 if (list_tail == NULL) {  // empty list
@@ -584,12 +589,10 @@ static int find_dir_inode(struct dfs_dentry *dentry, struct dfs_inode *parent_di
             }
 
             if (!visited) {
-                if (DB_MODE) {
-                printf(GRN "  > Found lost dir inode at %p (%lx)! (#%d of %lx ~ %lx)\n" RESET,
+                dprintf(GRN "  > Found lost dir inode at %p (%lx)! (#%d of %lx ~ %lx)\n" RESET,
                         curr_inode, DB_get_off(curr_inode), inodes_traversed,
                         DB_get_off((char *)chunks + chunk_index * sb->chunk_size),
                         DB_get_off((char *)chunks + (chunk_index + 1) * sb->chunk_size));
-                }
                 dentry->inode = unmap_inode(curr_inode);
                 return TARGET_FOUND;
             }
@@ -609,15 +612,13 @@ static int find_dir_inode(struct dfs_dentry *dentry, struct dfs_inode *parent_di
 static void recover_dentries(struct dfs_inode *dir_inode, struct stack *visited_dents)
 {
     int total_found = 0;
-    if (DB_MODE)
-        printf(BLU ":: Attempting to recover dentries, directory inode: %p.\n" RESET, dir_inode);
+    dprintf(BLU ":: Attempting to recover dentries, directory inode: %p.\n" RESET, dir_inode);
     for (int size_index = DFS_META_DIR_INODE_BITMAP + 1;
                             size_index < DFS_META_FREE_BITMAP; size_index++) {
         total_found += traverse_bitmap(size_index, 
                                     (void *)visited_dents, dir_inode, &relink_dentries);
     }
-    if (DB_MODE)
-        printf(BLU "  Total: recovered %d dentries.\n" RESET, total_found);
+    dprintf(BLU "  Total: recovered %d dentries.\n" RESET, total_found);
 }
 
 /*
@@ -680,8 +681,7 @@ static void recover_datachunk_child(struct dfs_datachunk *dc, int lost_child)
  */
 static void recover_dir_inode(struct dfs_dentry *dentry, struct dfs_inode *parent_inode)
 {
-    if (DB_MODE)
-        printf(BLU ":: Attempting to recover inode of dentry %s (%lx), target parent %p.\n" RESET,
+    dprintf(BLU ":: Attempting to recover inode of dentry %s (%lx), target parent %p.\n" RESET,
                                                dentry->name, DB_get_off(dentry), parent_inode);
     // Scan through directory inode bitmap
     int size_index = DFS_META_DIR_INODE_BITMAP;
@@ -692,8 +692,7 @@ static void recover_dir_inode(struct dfs_dentry *dentry, struct dfs_inode *paren
 static void check_root_dentry(struct dfs_dentry *root_dentry)
 {
     struct dfs_inode *root_inode = (struct dfs_inode *)sb->chunks;
-    if (DB_MODE)
-        printf("\n:: Checking root dentry... (root inode: %p)\n", img_to_mem(root_inode));
+    dprintf("\n:: Checking root dentry... (root inode: %p)\n", img_to_mem(root_inode));
 
     check_ptr(root_dentry->list.next, NULL,  "root dentry next", NO_COUNTER);
     check_ptr(root_dentry->parent, NULL, "root dentry parent", NO_COUNTER);
@@ -702,8 +701,7 @@ static void check_root_dentry(struct dfs_dentry *root_dentry)
             "root dentry ref count", NO_COUNTER);
     check_val(root_dentry->namelen, 0, "root dentry name length", NO_COUNTER);
     check_val(root_dentry->name[0], '\0', "root dentry name", NO_COUNTER);
-    if (DB_MODE)
-        printf(GRN "  Dentry good!\n" RESET);
+    dprintf(GRN "  Dentry good!\n" RESET);
 }
 
 /* Checks if the . and .. entries in of an inode are correct. */
@@ -722,12 +720,10 @@ static void check_root_inode(struct dfs_inode *root_inode)
 
     if (root_inode->data.dirents.next != NULL
             && check_meta_addr(root_inode->data.dirents.next)) {
-        if (DB_MODE)
-            printf(RED "Corrupt: root inode data corrupted. ptr: %p\n" RESET, 
+        dprintf(RED "Corrupt: root inode data corrupted. ptr: %p\n" RESET, 
                                                         root_inode->data.dirents.next);
         root_inode->data.dirents.next = NULL;
-        if (DB_MODE)
-            printf("Recovering root directory contents...\n");
+        dprintf("Recovering root directory contents...\n");
         recover_dentries(root_inode, NULL);
         bad_dentry_cnt++;
     }
@@ -784,8 +780,7 @@ static int check_imeta_arr()
     struct imeta *dup = img_to_mem(sb->imeta.dup_arr);
     struct imeta *p, *p_dup;    // loop var
 
-    if (DB_MODE)
-        printf(":: Checking imeta array...\n");
+    dprintf(":: Checking imeta array...\n");
 
     for (int i = 1; i < sb->imeta.sz; i++) {
         p = orig + i;
@@ -801,22 +796,20 @@ static int check_imeta_arr()
             continue;
         /* orig corrupt and duplicate good */
         if (p->chksum != p_chksum && p_dup->chksum == p_dup_chksum) {
-            if (DB_MODE)
-                printf(YEL "Corrupt: imeta item #%d corrupted in first copy.\n" RESET, i);
+            dprintf(YEL "Corrupt: imeta item #%d corrupted in first copy.\n" RESET, i);
             copy_imeta(p, p_dup);
             continue;
         }
         /* orig good and duplicate corrupt */
         if (p->chksum == p_chksum && p_dup->chksum != p_dup_chksum) {
-            if (DB_MODE)
-                printf(YEL "Corrupt: imeta item #%d corrupted in second copy.\n" RESET, i);
+            dprintf(YEL "Corrupt: imeta item #%d corrupted in second copy.\n" RESET, i);
             copy_imeta(p_dup, p);
             continue;
         }
         /* Both c**ked. */
         if (p->chksum != p_chksum && p_dup->chksum != p_dup_chksum) {
             // TODO: What to do? You're kinda screwed.
-            if (DB_MODE) {
+#ifdef DB_MODE
                 SET_CLR(RED);
                 printf("Corrupt: imeta item #%d is corrupt and not recoverable.\n", i);
                 printf(" [1]");
@@ -824,13 +817,12 @@ static int check_imeta_arr()
                 printf(" [2]");
                 print_imeta(p_dup);
                 SET_CLR(RESET);
-            }
+#endif
             return -1;
         }
     }
     
-    if (DB_MODE)
-        printf(GRN "  Imeta array checks out!\n" RESET);
+    dprintf(GRN "  Imeta array checks out!\n" RESET);
     return 0;
 }
 
@@ -998,7 +990,7 @@ static void load_superblock(size_t fs_size)
                         (DFS_META_SIZE_GRANULARITY * (i - DFS_META_DIR_INODE_BITMAP));
     }
 
-    if (DB_MODE) {
+#ifdef DB_MODE
         SET_CLR(GRN);
         printf("DEBUG: limits: \n");
         for (int i = 0; i < DFS_META_FREE_BITMAP; i++) {
@@ -1006,10 +998,10 @@ static void load_superblock(size_t fs_size)
         }
         SET_CLR(RESET);
     }
+#endif
 
     check_data_pool(&sb->data_pool);
-    if (DB_MODE)
-        printf(GRN "\n>> Superblock check completed.\n\n" RESET);
+    dprintf(GRN "\n>> Superblock check completed.\n\n" RESET);
 }
 
 /*
@@ -1136,11 +1128,9 @@ static int lazylist_alloc(void *addr, int size_index, size_t size)
         // free bit and chunk bit both 0, indicates full chunk
         if ((bitmap->ints[group] >> bit) % 2 == 0 
                     && lazylist_get_capacity(chunk_index) > 0) {
-            if (DB_MODE) {
-                printf(RED "Error: chunk already full. " \
+            dprintf(RED "Error: chunk already full. " \
                             "(index: %d, current capacity: %ld)\n" RED, 
                                 chunk_index, lazylist_get_capacity(chunk_index));
-            }
             return 1;
         }
         // Non-empty chunk, set bit to 0 if becomes full after update
@@ -1305,10 +1295,8 @@ static int check_datachunk(struct dfs_datachunk *dc,
     // check __rb_parent_color, mask out last two bits used to indicate color
     struct rb_node *dc_node = &dc->it.rb;
     if ((dc_node->__rb_parent_color & (~3UL)) != (unsigned long)mem_to_img(parent)) {
-        if (DB_MODE) {
-            printf(YEL "Corrupt: datachunk parent node pointer. (exp: %p, img: %p)\n" RESET,
-                    mem_to_img(parent), (void *)(dc_node->__rb_parent_color & (~3UL)));
-        }
+        dprintf(YEL "Corrupt: datachunk parent node pointer. (exp: %p, img: %p)\n" RESET,
+                mem_to_img(parent), (void *)(dc_node->__rb_parent_color & (~3UL)));
         dc_node->__rb_parent_color &= 3UL;  // clear out old parent addr
         dc_node->__rb_parent_color |= (unsigned long)mem_to_img(parent);
         err_count++;
@@ -1316,8 +1304,7 @@ static int check_datachunk(struct dfs_datachunk *dc,
 
     // check initialized bit in data_initialized field, mask out last bit
     if (!(dc->data_initialized & 1UL)) {
-        if (DB_MODE)
-            printf(YEL "Corrupt: datachunk initialized bit wrong.\n" RESET);
+        dprintf(YEL "Corrupt: datachunk initialized bit wrong.\n" RESET);
         dc->data_initialized |= 1UL;
         err_count++;
     }
@@ -1350,8 +1337,7 @@ static int check_datachunk(struct dfs_datachunk *dc,
     void *data = (void *)(dc->data_initialized & (~1UL));
     size_t data_size = dc->it.last - dc->it.start + 1;
     if (check_data_addr(data) || check_data_bitmap(data, data_size)) {
-        if (DB_MODE)
-            printf(RED "Corrupt: datachunk data pointer (%p) invalid.\n" RESET, data);
+        dprintf(RED "Corrupt: datachunk data pointer (%p) invalid.\n" RESET, data);
         stack_push(stack_new_node(dc), corrupt_datachunks);
     }
 
@@ -1419,16 +1405,14 @@ static int check_dir_inode(struct dfs_inode *inode, struct dfs_inode *parent)
     int *err_count = &count;
 
     if (check_checker_meta_bitmap(inode, DIR_INODE_SZ)) {
-        if (DB_MODE)
-            printf(RED "Corrupt: directory inode bad.\n" RESET);
+        dprintf(RED "Corrupt: directory inode bad.\n" RESET);
         return INODE_BAD;
     }
 
     inode = map_inode(inode);
     if (get_first_dentry(inode) != NULL
                 && check_meta_addr(inode->data.dirents.next)) {
-        if (DB_MODE)
-            printf(RED "Corrupt: directory inode data lost.\n" RESET);
+        dprintf(RED "Corrupt: directory inode data lost.\n" RESET);
         inode->data.dirents.next = NULL;
         return INODE_LOST_DATA;
     }
@@ -1436,8 +1420,7 @@ static int check_dir_inode(struct dfs_inode *inode, struct dfs_inode *parent)
     *err_count += check_dot_dents(inode, parent);
     check_val(inode->pincount.refs.counter, 0, "directory inode pincount", err_count);
     if ((inode->__lock_metaidx_size & LMS_LOCKMASK) != 0) {
-        if (DB_MODE)
-            printf(YEL "Corrupt: file inode locked.\n" RESET);
+        dprintf(YEL "Corrupt: file inode locked.\n" RESET);
         inode->__lock_metaidx_size = inode->__lock_metaidx_size & (~LMS_LOCKMASK);
         ++*err_count;
     }
@@ -1459,16 +1442,14 @@ static int check_file_inode(struct dfs_inode *inode)
     int *err_count = &count;    // I know this is weird
 
     if (check_checker_meta_bitmap(inode, FILE_INODE_SZ)) {
-        if (DB_MODE)
-            printf(RED "Corrupt: file inode bad.\n" RESET);
+        dprintf(RED "Corrupt: file inode bad.\n" RESET);
         return INODE_BAD;
     }
 
     inode = map_inode(inode);
     if (inode->data.chunks.rb_node != NULL 
             && check_meta_addr(inode->data.chunks.rb_node)) {
-        if (DB_MODE)
-            printf(RED "Corrupt: file inode data lost.\n" RESET);
+        dprintf(RED "Corrupt: file inode data lost.\n" RESET);
         inode->data.chunks.rb_node = NULL;
         return INODE_LOST_DATA;
     }
@@ -1477,8 +1458,7 @@ static int check_file_inode(struct dfs_inode *inode)
     check_val(inode->nlink, 1, "file inode nlink", err_count);
 
     if ((inode->__lock_metaidx_size & LMS_LOCKMASK) != 0) {
-        if (DB_MODE)
-            printf(YEL "Corrupt: file inode locked.\n" RESET);
+        dprintf(YEL "Corrupt: file inode locked.\n" RESET);
         inode->__lock_metaidx_size = inode->__lock_metaidx_size & (~LMS_LOCKMASK);
         ++*err_count;
     }
@@ -1514,31 +1494,26 @@ static int check_dentry(struct dfs_dentry *dentry, struct dfs_inode *parent_inod
     // Dentry pointer is corrupted, halt all checks and declare dentry dead
     if (check_meta_addr(dentry)) {
         // TODO: Do something to hopefully find the actual dentry location?
-        if (DB_MODE)
-            printf(RED "Corrupt: invalid dentry address.\n" RESET);
+        dprintf(RED "Corrupt: invalid dentry address.\n" RESET);
         bad_dentry_cnt++;
         return DENTRY_BAD;
     }
 
-    if (DB_MODE) {
-        printf(":: Checking dentry: %s (%p) [Parent ino: %p]...\n",
+    dprintf(":: Checking dentry: %s (%p) [Parent ino: %p]...\n",
                     (map_dentry(dentry))->name, map_dentry(dentry), parent_inode);
-    }
 
     dentry = map_dentry(dentry);
 
     // TODO: (low priority) handle corrupt names differently
     if (dentry->namelen == 0) {
-        if (DB_MODE)
-            printf(YEL "Corrupt: nameless dentry.\n" RESET);
+        dprintf(YEL "Corrupt: nameless dentry.\n" RESET);
         dentry->name[0] = '\0';
         err_count++;
     }
 
     for (int i = 0; i < dentry->namelen; i++) {
         if (dentry->name[i] == '\0') {
-            if (DB_MODE)
-                printf(YEL "Corrupt: dentry name is shorter than namelen indicates.\n" RESET);
+            dprintf(YEL "Corrupt: dentry name is shorter than namelen indicates.\n" RESET);
             dentry->namelen = i;
             err_count++;
             break;
@@ -1558,14 +1533,12 @@ static int check_dentry(struct dfs_dentry *dentry, struct dfs_inode *parent_inod
     if (check_checker_meta_bitmap(unmap_dentry(dentry), dentry_size)) {
         // the location pointed to by dentry is already occupied 
         // by something else, meaning this is a bad address
-        if (DB_MODE)
-            printf(RED "Corrupt: dentry address corrupted.\n" RESET);
+        dprintf(RED "Corrupt: dentry address corrupted.\n" RESET);
         return DENTRY_BAD_ADDR;
     }
 
     if (dentry->parent != unmap_inode(parent_inode)) {
-        if (DB_MODE)
-            printf(YEL "Corrupt: dentry back pointer corrupted.\n" RESET);
+        dprintf(YEL "Corrupt: dentry back pointer corrupted.\n" RESET);
         dentry->parent = unmap_inode(parent_inode);
         err_count++;
     }
@@ -1575,8 +1548,7 @@ static int check_dentry(struct dfs_dentry *dentry, struct dfs_inode *parent_inod
 
     // Make sure inode pointer is also intact
     if (check_meta_addr(dentry->inode)) {
-        if (DB_MODE)
-            printf(YEL "Corrupt: dentry has lost its inode.\n" RESET);
+        dprintf(YEL "Corrupt: dentry has lost its inode.\n" RESET);
         bad_dentry_cnt++;
         dentry->inode = NULL;
         ret = DENTRY_LOST_INODE;
@@ -1584,8 +1556,7 @@ static int check_dentry(struct dfs_dentry *dentry, struct dfs_inode *parent_inod
     
     // Inode pointer is good, check that inode
     if (ret != DENTRY_LOST_INODE) {
-        if (DB_MODE)
-            printf(  "Attempting to recover inode...\n");
+        dprintf(  "Attempting to recover inode...\n");
         struct dfs_inode *inode = map_inode(dentry->inode);
         int inode_err_code;
         if (isdir(inode)) {
@@ -1594,8 +1565,7 @@ static int check_dentry(struct dfs_dentry *dentry, struct dfs_inode *parent_inod
             inode_err_code = check_file_inode(mem_to_img(inode));
         } else {
             // inode is not file or directory, corrupted
-            if (DB_MODE)
-                printf(RED "Corrupt: inode of %s is neither a file nor a directory.\n" RESET, 
+            dprintf(RED "Corrupt: inode of %s is neither a file nor a directory.\n" RESET, 
                                                                 dentry->name);
             inode_err_code = INODE_BAD;
         }
@@ -1619,14 +1589,11 @@ static int check_dentry(struct dfs_dentry *dentry, struct dfs_inode *parent_inod
     }
 
     if (dentry->list.next != NULL && check_meta_addr(dentry->list.next)) {
-        if (DB_MODE)
-            printf(RED "Corrupt: dentry (%s) NEXT pointer corrupted! (%p)\n" RESET, 
+        dprintf(RED "Corrupt: dentry (%s) NEXT pointer corrupted! (%p)\n" RESET, 
                                             dentry->name, dentry->list.next);
         dentry->list.next = NULL;
         if (ret == DENTRY_LOST_INODE) {
-            if (DB_MODE) {
-                printf(RED " DEBUG (DENTRY_LST_INO_NXT): C**KING NORA. --JAMES MAY\n" RESET);
-            }
+            dprintf(RED " DEBUG (DENTRY_LST_INO_NXT): C**KING NORA. --JAMES MAY\n" RESET);
             ret = DENTRY_LST_INO_NXT; 
         } else {
             ret = DENTRY_LOST_NEXT;
@@ -1634,7 +1601,7 @@ static int check_dentry(struct dfs_dentry *dentry, struct dfs_inode *parent_inod
         err_count++;
     }
 
-    printf("  >> %d.\n", err_count);
+    dprintf("  >> %d.\n", err_count);
     if (err_count > DENTRY_BAD_THRESHOLD) {
         // Screw you guys. I'm going home.  -Eric Cartman
         return DENTRY_BAD;
@@ -1688,8 +1655,7 @@ static void insert_file_inode(struct dfs_inode *inode, int parent_inode_index)
             good_file = 0;
         } else if (ret) {
             // TODO: Declare file dead. Should anything be done about the file?
-            if (DB_MODE)
-                printf(RED "File is corrupted.\n" RESET);
+            dprintf(RED "File is corrupted.\n" RESET);
             stack_push(stack_new_node(inode), corrupt_files);
             good_file = 0;
         } else if (ret == 0) {
@@ -1731,9 +1697,7 @@ static void insert_file_inode(struct dfs_inode *inode, int parent_inode_index)
  */
 static void insert_dir_inode(struct dfs_inode *inode, int parent_inode_index)
 {
-    if (DB_MODE) {
-        printf(":: Inserting directory inode %p.\n", inode);
-    }
+    dprintf(":: Inserting directory inode %p.\n", inode);
     int ret_val;
 
     dirs = (struct inode_item *)
@@ -1756,30 +1720,24 @@ static void insert_dir_inode(struct dfs_inode *inode, int parent_inode_index)
         stack_push(stack_new_node(curr_dentry), visited_dents);
 
         if (ret_val == DENTRY_GOOD) {
-            if (DB_MODE) {
-                printf(GRN "  Dentry good! (inode: %p (%lx))\n" RESET,
-                    map_inode(curr_dentry->inode), DB_get_off(map_inode(curr_dentry->inode)));
-            }
+            dprintf(GRN "  Dentry good! (inode: %p (%lx))\n" RESET,
+                        map_inode(curr_dentry->inode), 
+                        DB_get_off(map_inode(curr_dentry->inode)));
             insert_dentry(curr_dentry, dir_count);
         } else if (ret_val == DENTRY_LST_INO_NXT) {
             // C**king nora.
-            if (DB_MODE) {
-                printf(YEL "  Dentry lost both inode and next pointer.\n" RESET);
-            }
+            dprintf(YEL "  Dentry lost both inode and next pointer.\n" RESET);
             recover_dentries(inode, visited_dents);
             stack_push(stack_new_node(curr_dentry), corrupt_dentries);
         } else if (ret_val == DENTRY_LOST_NEXT) {
-            if (DB_MODE)
-                printf(YEL "  Dentry good but lost its next pointer!\n" RESET);
+            dprintf(YEL "  Dentry good but lost its next pointer!\n" RESET);
             insert_dentry(curr_dentry, dir_count);
             recover_dentries(inode, visited_dents);
         } else if (ret_val == DENTRY_LOST_INODE) {
-            if (DB_MODE)
-                printf(RED "  Dentry has lost its node!\n" RESET);
+            dprintf(RED "  Dentry has lost its node!\n" RESET);
             stack_push(stack_new_node(curr_dentry), corrupt_dentries);
         } else if (ret_val == DENTRY_BAD_INODE) {
-            if (DB_MODE)
-                printf(RED "  Dentry's inode corrupted.\n" RESET);
+            dprintf(RED "  Dentry's inode corrupted.\n" RESET);
             struct dfs_dentry *bad_dent = curr_dentry;
             if (prev_dentry == NULL) {
                 inode->data.dirents.next = curr_dentry->list.next;
@@ -1797,8 +1755,7 @@ static void insert_dir_inode(struct dfs_inode *inode, int parent_inode_index)
             // lazylist_free(mem_to_img(bad_dent), DFS_META_DENTRY_BITMAP(dent_size), dent_size);
             continue;
         } else if (ret_val == DENTRY_BAD) {    // DENTRY_BAD
-            if (DB_MODE) 
-                printf(RED "  Dentry bad!\n" RESET);
+            dprintf(RED "  Dentry bad!\n" RESET);
             // FIXME
             if (prev_dentry != NULL) {
                 prev_dentry->list.next = NULL;
@@ -1857,9 +1814,8 @@ static void insert_dir_inode(struct dfs_inode *inode, int parent_inode_index)
                 remove_dentry(inode, dentry);
                 dfs_free_dentry(dentry);    
                 dentry = new_dent;
-                if (DB_MODE)
-                    printf(BLU "Dentry renamed %s. (%p, %lx, inode: %p)\n" RESET, 
-                                dentry->name, dentry, DB_get_off(dentry), map_inode(dentry->inode));
+                dprintf(BLU "Dentry renamed %s. (%p, %lx, inode: %p)\n" RESET, 
+                    dentry->name, dentry, DB_get_off(dentry), map_inode(dentry->inode));
             }
             int inode_ret = check_dir_inode(dentry->inode, inode); 
             if (inode_ret == INODE_LOST_DATA) {
@@ -1868,8 +1824,7 @@ static void insert_dir_inode(struct dfs_inode *inode, int parent_inode_index)
             }
             if (inode_ret == INODE_GOOD) {
                 insert_dentry(dentry, dir_count);
-                if (DB_MODE)
-                    printf(GRN "  Dentry good!\n" RESET);
+                dprintf(GRN "  Dentry good!\n" RESET);
             } else {
                 // TODO:
             }
@@ -1964,8 +1919,7 @@ static void check_directory_tree()
             insert_file_inode(curr_inode, curr_parent_inode_index);
         } else {
             // TODO: Is this redundant?
-            if (DB_MODE)
-                printf(RED "Error: inode not file or directory.\n" RESET);
+            dprintf(RED "Error: inode not file or directory.\n" RESET);
         }
         dentries_traversed++;
     }
@@ -2038,8 +1992,7 @@ static struct dfs_dentry *create_lostnfound_dir(struct dfs_inode *parent_dir)
     lostnfound_inode->nlink = 2;
 
     init_dentry(lostnfound, "lost+found", lostnfound_inode);
-    if (DB_MODE)
-        printf(GRN "  Created lost+found directory at %p, inode at %p.\n" RESET,
+    dprintf(GRN "  Created lost+found directory at %p, inode at %p.\n" RESET,
                                                 lostnfound, lostnfound_inode);
     // Insert lost+found into parent directory 
     lostnfound->list.next = parent_dir->data.dirents.next;
@@ -2063,8 +2016,7 @@ static int find_lost_files(struct dfs_dentry *dentry, struct dfs_inode *inode,
                                    ((char *)chunks + chunk_index * sb->chunk_size);
 
     if (!DFS_META_CHUNK_BIT(&llist_heads[chunk_index])) {   // chunk on first run
-        if (DB_MODE)
-            printf(MAG ":: DEBUG: Chunk on first run!\n" RESET);
+        dprintf(MAG ":: DEBUG: Chunk on first run!\n" RESET);
         // If chunk is on its first run, then all the allocated data are laid out
         // sequentially, ending at head->head.
         void *end_point = img_to_mem(llist_heads[chunk_index].head);
@@ -2085,8 +2037,7 @@ static int find_lost_files(struct dfs_dentry *dentry, struct dfs_inode *inode,
             curr_inode = (void *)curr_inode + FILE_INODE_SZ;
         }
     } else if (lazylist_get_bit(size_index, chunk_index) == 1) {    // chunk not full
-        if (DB_MODE)
-            printf(MAG ":: DEBUG: Chunk not full!\n" RESET);
+        dprintf(MAG ":: DEBUG: Chunk not full!\n" RESET);
         for (int i = 0; i < chunk_capacity_limit[size_index]; i++) {
             // check if address is unused, if so, skip
             bool unused = 0;
@@ -2115,8 +2066,7 @@ static int find_lost_files(struct dfs_dentry *dentry, struct dfs_inode *inode,
             curr_inode = (void *)curr_inode + FILE_INODE_SZ;
         }
     } else if (lazylist_get_bit(size_index, chunk_index) == 0) {    // chunk is full
-        if (DB_MODE)
-            printf(MAG ":: DEBUG: Chunk full!\n" RESET);
+        dprintf(MAG ":: DEBUG: Chunk full!\n" RESET);
         for (int i = 0; i < chunk_capacity_limit[size_index]; i++) {
             bool visited = 0;
             for (int i = 0; i < files_size; i++) {
@@ -2138,8 +2088,7 @@ static int find_lost_files(struct dfs_dentry *dentry, struct dfs_inode *inode,
 /* Gather lost files and return them as a stack. */
 static struct stack *gather_lost_files()
 {
-    if (DB_MODE)
-        printf(BLU "  Gathering lost files...\n" RESET);
+    dprintf(BLU "  Gathering lost files...\n" RESET);
     int size_index = DFS_META_FILE_INODE_BITMAP;
     traverse_bitmap(size_index, NULL, NULL, &find_lost_files);
     return lost_files; 
@@ -2378,9 +2327,7 @@ static struct stack *gather_lost_root_datachunks()
             }
         }
     }
-    if (DB_MODE) {
-        printf("Total: %ld orphaned root datachunks found.\n", lost_dcs->size);
-    }
+    dprintf("Total: %ld orphaned root datachunks found.\n", lost_dcs->size);
     return lost_dcs;
 }
 
@@ -2457,14 +2404,11 @@ static void recover_data()
     if (corrupt_datachunks->size == 1) {
         struct dfs_datachunk *dc = stack_pop(corrupt_datachunks)->data;
         size_t data_size = dc->it.last - dc->it.start + 1;
-        if (DB_MODE) {
-            printf("  Only one datachunk has lost its data pointer. Proceeding...\n"); 
-            printf("  :: Datachunk address: %p, data size: %lx.\n", dc, data_size);
-        }
+        dprintf("  Only one datachunk has lost its data pointer. Proceeding...\n"); 
+        dprintf("  :: Datachunk address: %p, data size: %lx.\n", dc, data_size);
         void *addr = find_lost_data_block(data_size);
         if (addr != NULL) {
-            if (DB_MODE)
-                printf(GRN "  :: Recovered address: %p.\n" RESET, addr);
+            dprintf(GRN "  :: Recovered address: %p.\n" RESET, addr);
             dc->data_initialized = (unsigned long)addr;
             dc->data_initialized |= 1;   // set initialized bit
         } else {
@@ -2592,10 +2536,8 @@ static void fix_file(struct dfs_inode *file)
     };
 
     struct stack *all_dc = gather_all_datachunks_of_file(file);
-    if (DB_MODE) {
-        printf("  Fixing file inode %p (%lx).\n", file, DB_get_off(file));
-        printf("    Total: %ld datachunks found.\n", all_dc->size);
-    }
+    dprintf("  Fixing file inode %p (%lx).\n", file, DB_get_off(file));
+    dprintf("    Total: %ld datachunks found.\n", all_dc->size);
 
 
     int num_chunks = all_dc->size;
@@ -2663,10 +2605,7 @@ static void fix_file(struct dfs_inode *file)
  */
 static void free_bad_datachunks()
 {
-    if (DB_MODE) {
-        printf(":: Freeing bad datachunks (Total: %ld)...\n", bad_datachunks->size);
-        // stack_print_all(bad_datachunks);
-    }
+    dprintf(":: Freeing bad datachunks (Total: %ld)...\n", bad_datachunks->size);
 
     struct dfs_datachunk *dc;
     while (bad_datachunks->size > 0) {
@@ -2711,19 +2650,15 @@ static int meta_chunk_verify_bit(int chunk_index)
     image_free_bit = lazylist_get_bit(DFS_META_FREE_BITMAP, chunk_index);
 
     if (image_size_index_bit != checker_size_index_bit) {
-        if (DB_MODE) {
-            printf(YEL "Bitmap inconsistency! exp: %d, img: %d [SIdx: %d, CIdx: %d]\n" RESET, 
-                          checker_size_index_bit, image_size_index_bit, size_index, chunk_index);
-        }
+        dprintf(YEL "Bitmap inconsistency! exp: %d, img: %d [SIdx: %d, CIdx: %d]\n" RESET, 
+                  checker_size_index_bit, image_size_index_bit, size_index, chunk_index);
         image_flip_bit(size_index, chunk_index);  
         bad_bit_cnt++;
     }
     
     if (image_free_bit != checker_free_bit) {
-        if (DB_MODE) {
-            printf(YEL "Free bitmap inconsistency! exp: %d, img: %d [CIdx: %d]\n" RESET, 
-                                checker_free_bit, image_free_bit, chunk_index);
-        }
+        dprintf(YEL "Free bitmap inconsistency! exp: %d, img: %d [CIdx: %d]\n" RESET, 
+                            checker_free_bit, image_free_bit, chunk_index);
         image_flip_bit(DFS_META_FREE_BITMAP, chunk_index);
         bad_bit_cnt++;
     }
@@ -2733,10 +2668,8 @@ static int meta_chunk_verify_bit(int chunk_index)
         if (i == size_index)
             continue;   // skip the target level
         if (lazylist_get_bit(i, chunk_index) == 1) {
-            if (DB_MODE) {
-                printf(YEL "Bitmap size index inconsistency! [SIdx: %d, CIdx: %d]\n" RESET, 
+            dprintf(YEL "Bitmap size index inconsistency! [SIdx: %d, CIdx: %d]\n" RESET, 
                                                    size_index, chunk_index);
-            }
             image_flip_bit(i, chunk_index); 
             bad_bit_cnt++;
         }
@@ -2879,8 +2812,7 @@ static void dfsck_exit()
     }
     free(chunk_records);
 
-    if (DB_MODE)
-        printf("========================= DFSCK 2.0 =========================\n");
+    dprintf("========================= DFSCK 2.0 =========================\n");
     exit(0);
 }
 
@@ -2889,20 +2821,21 @@ static void dfsck_exit()
  */
 static void print_results() 
 {
-    if (DB_MODE) {
+#ifdef DB_MODE
         printf("Bad intervals count: %d.\n", bad_interval_cnt);
         printf("Corrupted datachunks: (Total: %ld)\n", corrupt_datachunks->size);
         stack_print_all(corrupt_datachunks);
 
         printf("\n");
-    }
+#endif
 
     static unsigned long expected_total_bytes = 0x28e5000;
     unsigned long total_bytes = total_good_file_bytes + total_bad_file_bytes;
     unsigned long lost_bytes = expected_total_bytes - total_bytes;
 
-    if (DB_MODE)
+#ifdef DB_MODE
         SET_CLR(GRN);
+#endif
     printf("Number of files:           %d.\n", file_count);
     printf("Number of directories:     %d.\n", dir_count);
     printf("Good file data bytes:      0x%lx.\n", total_good_file_bytes);
@@ -2911,8 +2844,9 @@ static void print_results()
     printf("Total lost bytes:          0x%lx.\n", lost_bytes);
     printf("Total lost kilobytes:      %lu.\n", lost_bytes / 0x1000);
     printf("  (NOTE: expected_total_bytes (=0x%lx) is a hardcoded value!)\n", expected_total_bytes);
-    if (DB_MODE)
+#ifdef DB_MODE
         SET_CLR(RESET);
+#endif
 }
 
 /* 
@@ -2956,8 +2890,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (DB_MODE)
-        printf("\n========================= DFSCK 2.0 =========================\n");
+    dprintf("\n========================= DFSCK 2.0 =========================\n");
     /* This is where the fun begins. --Darth Vader */
     clock_t begin = clock();
 
@@ -2975,8 +2908,7 @@ int main(int argc, char *argv[])
     int lostnfound_index = -1;
     lostnfound = find_lostnfound_dir(map_inode(sb->rootdir.inode));
     if (lostnfound == NULL) {
-        if (DB_MODE)
-            printf(YEL "  No lost+found folder found. Creating...\n" RESET);
+        dprintf(YEL "  No lost+found folder found. Creating...\n" RESET);
         lostnfound = create_lostnfound_dir(map_inode(sb->rootdir.inode));
         lostnfound_index = dir_count;
         insert_dir_inode(map_inode(lostnfound->inode), 0);
@@ -3005,7 +2937,7 @@ int main(int argc, char *argv[])
 
     print_results();
 
-    if (DB_MODE) {
+#ifdef DB_MODE
         // DEBUG: compare img bitmaps and checker bitmaps
         char yesno[4];
         printf("\nWould you like to see meta-metadata comparisons? (yes/no) ");
@@ -3018,7 +2950,7 @@ int main(int argc, char *argv[])
         if (strcmp(yesno, "y") == 0 || strcmp(yesno, "yes") == 0) {
             print_metadata();
         }
-    }
+#endif
 
     dfsck_exit();
 }
