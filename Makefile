@@ -18,17 +18,20 @@ SOURCES  := $(wildcard $(SRCDIR)/*.c)
 INCLUDES := $(wildcard $(SRCDIR)/*.h)
 OBJECTS  := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 rm       = rm -f
+mkdir    = mkdir -p
 
 
 $(BINDIR)/$(TARGET): $(OBJECTS)
+	@$(mkdir) $(BINDIR)
 	@$(LINKER) $(OBJECTS) $(LFLAGS) -o $@
 	@$(rm) $(TARGET)
 	@ln -s $(BINDIR)/$(TARGET)
 	@echo "Linking complete!"
 
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
+	@$(mkdir) $(OBJDIR)
+	@echo "Compiling "$<"..."
 	@$(CC) $(CFLAGS) -c $< -o $@
-	@echo "Compiled "$<" successfully!"
 
 .PHONY: clean
 clean:
