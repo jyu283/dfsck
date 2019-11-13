@@ -3,11 +3,11 @@ TARGET   = dfsck
 
 CC       = gcc
 # compiling flags here
-CFLAGS   = -std=c99 -Wall -I.
+CFLAGS   = -std=c99 -Wall -Werror -I./include -Wno-unused-variable -Wno-unused-function
 
 LINKER   = gcc
 # linking flags here
-LFLAGS   = -Wall -I. -lm
+LFLAGS   = -Wall -I./include -lm
 
 # change these to proper directories where each file should be
 SRCDIR   = src
@@ -22,6 +22,8 @@ rm       = rm -f
 
 $(BINDIR)/$(TARGET): $(OBJECTS)
 	@$(LINKER) $(OBJECTS) $(LFLAGS) -o $@
+	@$(rm) $(TARGET)
+	@ln -s $(BINDIR)/$(TARGET)
 	@echo "Linking complete!"
 
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
