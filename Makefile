@@ -3,7 +3,8 @@ TARGET   = dfsck
 
 CC       = gcc
 # compiling flags here
-CFLAGS   = -std=c99 -Wall -Werror -I./include -Wno-unused-variable -Wno-unused-function
+CFLAGS   = -std=c99 -Wall -Werror -g -O2 -I./include \
+		   -Wno-unused-variable -Wno-unused-function
 
 LINKER   = gcc
 # linking flags here
