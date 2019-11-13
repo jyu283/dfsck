@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
-#include "include/dfs_allocation.h"
-#include "include/dfs.h"
-#include "include/dfsck.h"
-#include "include/dfsck_util.h"
+#include "dfs_allocation.h"
+#include "dfs.h"
+#include "dfsck.h"
+#include "dfsck_util.h"
 
 /* NOTICE: All functions in this file take and return MMAP addresses. */
 

@@ -23,7 +23,7 @@
 
 // stdio is only really needed for printing error messages
 #include <stdio.h>
-#include "include/rbtree.h"
+#include "rbtree.h"
 
 /*****************  Red/Black Trees (in your data str) **************/
 

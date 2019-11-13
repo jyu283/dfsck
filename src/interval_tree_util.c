@@ -32,8 +32,8 @@
 
 #include <stdio.h>
 
-#include "include/interval_tree_util.h"
-#include "include/dfsck_util.h"
+#include "interval_tree_util.h"
+#include "dfsck_util.h"
 
 static struct dfs_datachunk *first_chunk, *last_chunk;
 static int total_black_count;

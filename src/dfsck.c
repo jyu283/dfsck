@@ -17,6 +17,15 @@
  *     17 August 2019
  */
 
+#include "dfsck.h"
+#include "dfs.h"
+#include "stack.h"
+#include "list.h"
+#include "dfs_allocation.h"
+#include "dfsck_util.h"
+#include "interval_tree_util.h"
+#include "rbtree.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -26,16 +35,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#include "include/dfsck.h"
-#include "include/dfs.h"
-#include "include/stack.h"
-#include "include/list.h"
-#include "include/dfs_allocation.h"
-#include "include/dfsck_util.h"
-#include "include/interval_tree_util.h"
-#include "include/rbtree.h"
-
 
 #define DB_MODE         1   /* Set to 1 to enable debug printouts. */
 /* Frequently used image addresses */

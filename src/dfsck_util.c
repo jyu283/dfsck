@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
-#include "include/dfsck_util.h" 
-#include "include/dfsck.h"
-#include "include/interval_tree_util.h"
+#include "dfsck_util.h" 
+#include "dfsck.h"
+#include "interval_tree_util.h"
 
 extern void *image_mem;
 extern struct dfs_fs *sb;
