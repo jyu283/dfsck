@@ -20,13 +20,14 @@ INCLUDES := $(wildcard $(SRCDIR)/*.h)
 OBJECTS  := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 rm       = rm -f
 mkdir    = mkdir -p
+ln       = ln -s
 
 
 $(BINDIR)/$(TARGET): $(OBJECTS)
 	@$(mkdir) $(BINDIR)
 	@$(LINKER) $(OBJECTS) $(LFLAGS) -o $@
 	@$(rm) $(TARGET)
-	@ln -s $(BINDIR)/$(TARGET)
+	@$(ln) $(BINDIR)/$(TARGET)
 	@echo "Linking complete!"
 
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
@@ -36,10 +37,12 @@ $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
 
 .PHONY: clean
 clean:
+	@$(rm) $(TARGET)
 	@$(rm) $(OBJECTS)
 	@echo "Cleanup complete!"
 
 .PHONY: remove
 remove: clean
+	@$(rm) $(TARGET)
 	@$(rm) $(BINDIR)/$(TARGET)
 	@echo "Executable removed!"
