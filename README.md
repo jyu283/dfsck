@@ -1,7 +1,4 @@
 # dfsck
-File System Checker for QuietFS.
+A snapshot of the File System Checker for DenseFS.
 
-If you have been handed this code to work on, I am very, very, very deeply sorry.
-
-Jerry Yu
-19 December, 2019
+This is not the development repository.
